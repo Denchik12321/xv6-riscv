@@ -22,6 +22,9 @@ void            consoleinit(void);
 void            consoleintr(int);
 void            consputc(int);
 
+// devs.c
+void            devs_init(void);
+
 // exec.c
 int             kexec(char*, char**);
 
