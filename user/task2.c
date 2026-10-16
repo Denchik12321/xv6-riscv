@@ -45,12 +45,18 @@ int main(int argc, char* argv[]) {
 
     for (int i = 1; i < argc; i++) {
         int n = strlen(argv[i]);
-
-        if (write(fds[1], argv[i], n) != n) {
-            fprintf(2, "write failed\n");
-            exit(1);
+        int off = 0;
+        
+        while(off < n) {
+            int w = write(fds[1], argv[i], n);
+            if (w <= 0) {
+                fprintf(2, "write failed\n");
+                exit(1);
+            }
+            off += w;
         }
-        if (write(fds[1], "\n", 1) != 1) {
+
+        if (write(fds[1], "\n", 1) <= 0) {
             fprintf(2, "write failed\n");
             exit(1);
         }
