@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
         int off = 0;
         
         while(off < n) {
-            int w = write(fds[1], argv[i], n);
+            int w = write(fds[1], argv[i] + off, n - off);
             if (w <= 0) {
                 fprintf(2, "write failed\n");
                 exit(1);
