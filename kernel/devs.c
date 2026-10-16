@@ -10,9 +10,15 @@
 
 static struct {
     struct spinlock lock;
-    uint64 urandom_state;
-    uint64 nullstat_bytes;
-} pseudo;
+    uint64 state;
+} urandom_state;
+
+static struct {
+    struct spinlock lock;
+    uint64 bytes;
+} nullstat_bytes;
+
+static char zero_buf[PGSIZE];
 
 static inline uint64
 lcg_next(uint64 *s)
@@ -36,14 +42,13 @@ pseudo_read(int user_dst, uint64 dst, int n, int minor)
 
         case MINOR_ZERO:
         {
-            memset(buf, 0, sizeof(buf));
             while(total < n) {
                 int chunk = n - total;
 
-                if (chunk > (int)sizeof(buf)) {
-                    chunk = sizeof(buf);
+                if (chunk > (int)sizeof(zero_buf)) {
+                    chunk = sizeof(zero_buf);
                 }
-                if (either_copyout(user_dst, dst + total, buf, chunk) < 0) {
+                if (either_copyout(user_dst, dst + total, zero_buf, chunk) < 0) {
                     return -1;
                 }
 
@@ -61,11 +66,11 @@ pseudo_read(int user_dst, uint64 dst, int n, int minor)
                     chunk = sizeof(buf);
                 }
 
-                acquire(&pseudo.lock);
+                acquire(&urandom_state.lock);
                 for (int i = 0; i < chunk; i++) {
-                    buf[i] = (char)(lcg_next(&pseudo.urandom_state) >> 33);
+                    buf[i] = (char)(lcg_next(&urandom_state.state) >> 33);
                 }
-                release(&pseudo.lock);
+                release(&urandom_state.lock);
 
                 if (either_copyout(user_dst, dst + total, buf, chunk) < 0) {
                     return -1;
@@ -82,9 +87,9 @@ pseudo_read(int user_dst, uint64 dst, int n, int minor)
                 return -1;
             }
 
-            acquire(&pseudo.lock);
-            uint64 v = pseudo.nullstat_bytes;
-            release(&pseudo.lock);
+            acquire(&nullstat_bytes.lock);
+            uint64 v = nullstat_bytes.bytes;
+            release(&nullstat_bytes.lock);
 
             memmove(buf, &v, sizeof(uint64));
             if (either_copyout(user_dst, dst, buf, sizeof(uint64)) < 0) {
@@ -124,18 +129,18 @@ pseudo_write(int user_src, uint64 src, int n, int minor)
                 return -1;
             }
 
-            acquire(&pseudo.lock);
-            pseudo.urandom_state = seed;
-            release(&pseudo.lock);
+            acquire(&urandom_state.lock);
+            urandom_state.state = seed;
+            release(&urandom_state.lock);
 
             return sizeof(uint64);
         }
 
         case MINOR_NULLSTAT:
         {
-            acquire(&pseudo.lock);
-            pseudo.nullstat_bytes += (uint64)n;
-            release(&pseudo.lock);
+            acquire(&nullstat_bytes.lock);
+            nullstat_bytes.bytes += (uint64)n;
+            release(&nullstat_bytes.lock);
 
             return n;
         }
@@ -147,9 +152,11 @@ pseudo_write(int user_src, uint64 src, int n, int minor)
 void
 devs_init(void)
 {
-    initlock(&pseudo.lock, "pseudo");
-    pseudo.urandom_state = 0x123456789abcdef0ULL;
-    pseudo.nullstat_bytes = 0;
+    initlock(&urandom_state.lock, "urandom");
+    initlock(&nullstat_bytes.lock, "nullstat");
+
+    urandom_state.state = 0x123456789abcdef0ULL;
+    nullstat_bytes.bytes = 0;
 
     devsw[DEV_PSEUDO].read  = pseudo_read;
     devsw[DEV_PSEUDO].write = pseudo_write;
