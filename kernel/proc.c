@@ -688,3 +688,75 @@ procdump(void)
     printf("\n");
   }
 }
+
+
+uint64
+sys_ps_listinfo(void)
+{
+  uint64 plist_addr;
+  int lim;
+  argaddr(0, &plist_addr);
+  argint(1, &lim);
+
+  struct proc *p;
+  struct proc *cur = myproc();
+  struct procinfo info;
+
+  if (plist_addr == 0) {
+    int count = 0;
+    for (p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if (p->state != UNUSED && p->state != USED) {
+        count++;
+      }
+      release(&p->lock);
+    }
+    return count;
+  }
+
+  int written = 0;
+  for (p = proc; p < &proc[NPROC]; p++) {
+    acquire(&wait_lock);
+    acquire(&p->lock);
+
+    int state = p->state;
+    if (state == UNUSED || state == USED) {
+      release(&p->lock);
+      release(&wait_lock);
+      continue;
+    }
+
+    info.pid = p->pid;
+    info.state = state;
+    // info.ppid = p->parent ? p->parent->pid : 0;
+    safestrcpy(info.name, p->name, sizeof(info.name));
+
+    info.ppid = 0;
+    info.pname[0] = '\0';
+    if (p->parent) {
+      struct proc *par = p->parent;
+      acquire(&par->lock);
+      info.ppid = par->pid;
+      safestrcpy(info.pname, par->name, sizeof(info.pname));
+      release(&par->lock);
+    }
+
+    release(&p->lock);
+    release(&wait_lock);
+
+    if (written >= lim) {
+      return PS_ERR_LIMIT;
+    }
+
+    if (copyout(cur->pagetable,
+                plist_addr + (uint64)written * sizeof(info),
+                (char *)&info, sizeof(info)) < 0) 
+    {
+        return PS_ERR_ADDR;
+    }
+
+    written++;
+  }
+
+  return written;
+}
