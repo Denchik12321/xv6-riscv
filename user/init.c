@@ -8,6 +8,7 @@
 #include "kernel/file.h"
 #include "user/user.h"
 #include "kernel/fcntl.h"
+#include "kernel/devs.h"
 
 char *argv[] = { "sh", 0 };
 
@@ -18,6 +19,10 @@ main(void)
 
   if(open("console", O_RDWR) < 0){
     mknod("console", CONSOLE, 0);
+    mknod("null",     DEV_PSEUDO, MINOR_NULL);
+    mknod("zero",     DEV_PSEUDO, MINOR_ZERO);
+    mknod("urandom",  DEV_PSEUDO, MINOR_URANDOM);
+    mknod("nullstat", DEV_PSEUDO, MINOR_NULLSTAT);
     open("console", O_RDWR);
   }
   dup(0);  // stdout
