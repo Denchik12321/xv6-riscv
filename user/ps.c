@@ -35,11 +35,11 @@ main(int argc, char *argv[])
         exit(1);
     }
 
-    printf("pid  ppid  state  name\n");
+    printf("pid  ppid  state  name  pname\n");
     for (int i = 0; i < m; i++) {
         int st = list[i].state;
         char *s = (st >= 0 && st < 6) ? states[st] : "???";
-        printf("%d %d %s %s\n", list[i].pid, list[i].ppid, s, list[i].name);
+        printf("%d %d %s %s %s\n", list[i].pid, list[i].ppid, s, list[i].name, list[i].pname);
     }
 
     free(list);

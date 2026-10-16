@@ -15,6 +15,7 @@ struct procinfo {
     int ppid;
     int state;
     char name[16];
+    char pname[16];
 };
 
 #define PS_ERR_ADDR  (-1)

@@ -706,7 +706,7 @@ sys_ps_listinfo(void)
     int count = 0;
     for (p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if (p->state != UNUSED) {
+      if (p->state != UNUSED && p->state != USED) {
         count++;
       }
       release(&p->lock);
@@ -720,7 +720,7 @@ sys_ps_listinfo(void)
     acquire(&p->lock);
 
     int state = p->state;
-    if (state == UNUSED) {
+    if (state == UNUSED || state == USED) {
       release(&p->lock);
       release(&wait_lock);
       continue;
@@ -728,8 +728,18 @@ sys_ps_listinfo(void)
 
     info.pid = p->pid;
     info.state = state;
-    info.ppid = p->parent ? p->parent->pid : 0;
+    // info.ppid = p->parent ? p->parent->pid : 0;
     safestrcpy(info.name, p->name, sizeof(info.name));
+
+    info.ppid = 0;
+    info.pname[0] = '\0';
+    if (p->parent) {
+      struct proc *par = p->parent;
+      acquire(&par->lock);
+      info.ppid = par->pid;
+      safestrcpy(info.pname, par->name, sizeof(info.pname));
+      release(&par->lock);
+    }
 
     release(&p->lock);
     release(&wait_lock);
